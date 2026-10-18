@@ -1,9 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'common/appcolor.dart';
+import 'services/currency_rate_service.dart';
 import 'splash_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -43,19 +44,22 @@ class _CurrencyConverterState extends State<CurrencyConverter> {
   Future<void> fetchRate() async {
     setState(() => isLoading = true);
 
-    final url =
-        'https://api.exchangerate-api.com/v4/latest/$fromCurrency';
-
     try {
-      final response = await http.get(Uri.parse(url));
-      final data = json.decode(response.body);
+      final fetchedRate =
+          await CurrencyRateService.getExchangeRate(fromCurrency, toCurrency);
 
-      setState(() {
-        rate = (data['rates'][toCurrency] as num).toDouble();
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          if (fetchedRate != null) {
+            rate = fetchedRate;
+          }
+          isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -81,12 +85,8 @@ class _CurrencyConverterState extends State<CurrencyConverter> {
     return Scaffold(
       body: Container(
         padding: EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.blueAccent, Colors.deepPurple],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+        decoration: const BoxDecoration(
+          gradient: gradientColors.primaryGradient,
         ),
         child: SafeArea(
           child: Column(

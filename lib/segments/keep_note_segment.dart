@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/note_storage_service.dart';
 
 class NoteItem {
   final String id;
@@ -16,6 +17,38 @@ class NoteItem {
     required this.date,
     required this.tagColor,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'content': content,
+      'category': category,
+      'date': date.toIso8601String(),
+      'tagColor': tagColor.toARGB32(),
+    };
+  }
+
+  factory NoteItem.fromJson(Map<String, dynamic> json) {
+    int colorVal = 0xFF673AB7;
+    final dynamic colorRaw = json['tagColor'];
+    if (colorRaw is int) {
+      colorVal = colorRaw;
+    } else if (colorRaw is num) {
+      colorVal = colorRaw.toInt();
+    } else if (colorRaw is String) {
+      colorVal = int.tryParse(colorRaw) ?? 0xFF673AB7;
+    }
+
+    return NoteItem(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? '',
+      content: json['content']?.toString() ?? '',
+      category: json['category']?.toString() ?? 'Finance',
+      date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
+      tagColor: Color(colorVal),
+    );
+  }
 }
 
 class KeepNoteSegment extends StatefulWidget {
@@ -26,35 +59,28 @@ class KeepNoteSegment extends StatefulWidget {
 }
 
 class _KeepNoteSegmentState extends State<KeepNoteSegment> {
-  final List<NoteItem> _notes = [
-    NoteItem(
-      id: '1',
-      title: 'Exchange Rate Target 🎯',
-      content:
-          'Monitor USD to BDT. If rate crosses 122.50, initiate transfer for overseas investment.',
-      category: 'Finance',
-      date: DateTime.now().subtract(const Duration(hours: 3)),
-      tagColor: Colors.deepPurple,
-    ),
-    NoteItem(
-      id: '2',
-      title: 'Monthly Budget Limits 📋',
-      content:
-          'Groceries: \$450 max\nDining Out: \$150 max\nEmergency savings deposit: \$500',
-      category: 'Budget',
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      tagColor: Colors.teal,
-    ),
-    NoteItem(
-      id: '3',
-      title: 'Upcoming Travel Currency ✈️',
-      content:
-          'Withdraw 50,000 JPY at airport exchange counter or use zero-fee travel card.',
-      category: 'Travel',
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      tagColor: Colors.amber.shade800,
-    ),
-  ];
+  List<NoteItem> _notes = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    final loaded = await NoteStorageService.loadNotes();
+    if (mounted) {
+      setState(() {
+        _notes = loaded;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveNotes() async {
+    await NoteStorageService.saveNotes(_notes);
+  }
 
   String _selectedCategory = 'All';
   final TextEditingController _searchController = TextEditingController();
@@ -233,7 +259,7 @@ class _KeepNoteSegmentState extends State<KeepNoteSegment> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           final title = titleController.text.trim();
                           final content = contentController.text.trim();
                           if (title.isEmpty && content.isEmpty) return;
@@ -257,10 +283,15 @@ class _KeepNoteSegmentState extends State<KeepNoteSegment> {
                               existingNote.content = content;
                               existingNote.category = selectedCat;
                               existingNote.tagColor = selectedColor;
+                              existingNote.date = DateTime.now();
                             }
                           });
 
-                          Navigator.pop(modalContext);
+                          await _saveNotes();
+
+                          if (modalContext.mounted) {
+                            Navigator.pop(modalContext);
+                          }
                         },
                         child: Text(
                           existingNote == null ? 'Save Note' : 'Update Note',
@@ -278,10 +309,11 @@ class _KeepNoteSegmentState extends State<KeepNoteSegment> {
     );
   }
 
-  void _deleteNote(String id) {
+  Future<void> _deleteNote(String id) async {
     setState(() {
       _notes.removeWhere((item) => item.id == id);
     });
+    await _saveNotes();
   }
 
   @override
@@ -379,8 +411,14 @@ class _KeepNoteSegmentState extends State<KeepNoteSegment> {
 
           // Notes List
           Expanded(
-            child: filtered.isEmpty
-                ? Center(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                    ),
+                  )
+                : filtered.isEmpty
+                    ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
