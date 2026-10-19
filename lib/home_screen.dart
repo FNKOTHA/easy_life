@@ -100,18 +100,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.account_balance_wallet_outlined,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
+                    // Container(
+                    //   padding: const EdgeInsets.all(8),
+                    //   decoration: BoxDecoration(
+                    //     color: Colors.white.withValues(alpha: 0.2),
+                    //     shape: BoxShape.circle,
+                    //   ),
+                    //   child: const Icon(
+                    //     Icons.account_balance_wallet_outlined,
+                    //     color: Colors.white,
+                    //     size: 24,
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
@@ -139,12 +139,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           curve: Curves.easeInOut,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSelected ? Colors.white : Colors.transparent,
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.12),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.12,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 3),
                                     ),
@@ -176,10 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Main Active Segment (Preserves state of each segment)
               Expanded(
-                child: IndexedStack(
-                  index: _currentIndex,
-                  children: _segments,
-                ),
+                child: IndexedStack(index: _currentIndex, children: _segments),
               ),
             ],
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/expense_storage_service.dart';
 
 class ExpenseTransaction {
   final String id;
@@ -16,6 +17,45 @@ class ExpenseTransaction {
     required this.category,
     required this.date,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'amount': amount,
+      'isIncome': isIncome,
+      'category': category,
+      'date': date.toIso8601String(),
+    };
+  }
+
+  factory ExpenseTransaction.fromJson(Map<String, dynamic> json) {
+    double parsedAmount = 0.0;
+    final dynamic amountRaw = json['amount'];
+    if (amountRaw is num) {
+      parsedAmount = amountRaw.toDouble();
+    } else if (amountRaw is String) {
+      parsedAmount = double.tryParse(amountRaw) ?? 0.0;
+    }
+
+    bool parsedIsIncome = false;
+    final dynamic isIncomeRaw = json['isIncome'];
+    if (isIncomeRaw is bool) {
+      parsedIsIncome = isIncomeRaw;
+    } else if (isIncomeRaw is String) {
+      parsedIsIncome = isIncomeRaw.toLowerCase() == 'true';
+    }
+
+    return ExpenseTransaction(
+      id: json['id']?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? '',
+      amount: parsedAmount,
+      isIncome: parsedIsIncome,
+      category: json['category']?.toString() ?? 'Other',
+      date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
 }
 
 class ExpenseTrackSegment extends StatefulWidget {
@@ -26,48 +66,28 @@ class ExpenseTrackSegment extends StatefulWidget {
 }
 
 class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
-  final List<ExpenseTransaction> _transactions = [
-    ExpenseTransaction(
-      id: '1',
-      title: 'Salary Deposit',
-      amount: 3200.00,
-      isIncome: true,
-      category: 'Salary',
-      date: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    ExpenseTransaction(
-      id: '2',
-      title: 'Grocery Supermarket',
-      amount: 86.50,
-      isIncome: false,
-      category: 'Food',
-      date: DateTime.now().subtract(const Duration(hours: 5)),
-    ),
-    ExpenseTransaction(
-      id: '3',
-      title: 'High-Speed Internet Bill',
-      amount: 55.00,
-      isIncome: false,
-      category: 'Bills',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    ExpenseTransaction(
-      id: '4',
-      title: 'Freelance Design Project',
-      amount: 650.00,
-      isIncome: true,
-      category: 'Freelance',
-      date: DateTime.now().subtract(const Duration(days: 4)),
-    ),
-    ExpenseTransaction(
-      id: '5',
-      title: 'Flight Ticket Booking',
-      amount: 280.00,
-      isIncome: false,
-      category: 'Travel',
-      date: DateTime.now().subtract(const Duration(days: 6)),
-    ),
-  ];
+  List<ExpenseTransaction> _transactions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    final loaded = await ExpenseStorageService.loadTransactions();
+    if (mounted) {
+      setState(() {
+        _transactions = loaded;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveTransactions() async {
+    await ExpenseStorageService.saveTransactions(_transactions);
+  }
 
   String _filter = 'All'; // All, Income, Expense
 
@@ -263,7 +283,7 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                       controller: amountController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        labelText: 'Amount (\$)',
+                        labelText: 'Amount (৳)',
                         hintText: '0.00',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -308,7 +328,7 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           final title = titleController.text.trim();
                           final amount = double.tryParse(amountController.text.trim()) ?? 0;
                           if (title.isEmpty || amount <= 0) return;
@@ -327,7 +347,11 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                             );
                           });
 
-                          Navigator.pop(modalContext);
+                          await _saveTransactions();
+
+                          if (modalContext.mounted) {
+                            Navigator.pop(modalContext);
+                          }
                         },
                         child: const Text(
                           'Save Transaction',
@@ -345,10 +369,11 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
     );
   }
 
-  void _deleteTransaction(String id) {
+  Future<void> _deleteTransaction(String id) async {
     setState(() {
       _transactions.removeWhere((item) => item.id == id);
     });
+    await _saveTransactions();
   }
 
   @override
@@ -398,7 +423,7 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '\$${_totalBalance.toStringAsFixed(2)}',
+                    '\৳${_totalBalance.toStringAsFixed(2)}',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -447,7 +472,7 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                                       ),
                                     ),
                                     Text(
-                                      '+\$${_totalIncome.toStringAsFixed(0)}',
+                                      '+\৳${_totalIncome.toStringAsFixed(0)}',
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
@@ -499,7 +524,7 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                                       ),
                                     ),
                                     Text(
-                                      '-\$${_totalExpense.toStringAsFixed(0)}',
+                                      '-৳${_totalExpense.toStringAsFixed(0)}',
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
@@ -578,7 +603,16 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
             const SizedBox(height: 12),
 
             // Transactions List
-            if (filtered.isEmpty)
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 36),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                  ),
+                ),
+              )
+            else if (filtered.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(32),
@@ -586,13 +620,16 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                   color: Colors.white.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    Icon(Icons.receipt_outlined, color: Colors.white, size: 48),
-                    SizedBox(height: 8),
+                    const Icon(Icons.receipt_outlined, color: Colors.white, size: 48),
+                    const SizedBox(height: 8),
                     Text(
-                      'No transactions in this category',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      _transactions.isEmpty
+                          ? 'No transactions yet. Tap "+ Add Entry" to add one!'
+                          : 'No transactions in this category',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -600,7 +637,9 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
             else
               ...filtered.map((item) {
                 final catColor = _getCategoryColor(item.category);
-                final catIcon = _getCategoryIcon(item.category);
+                final 
+                
+                catIcon = _getCategoryIcon(item.category);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(14),
@@ -623,7 +662,8 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                           color: catColor.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(catIcon, color: catColor, size: 22),
+                        child: Icon(catIcon  
+                        , color: catColor, size: 22),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -640,7 +680,7 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${item.category} • ${item.date.day}/${item.date.month}',
+                              '${item.category} • ${item.date.day}/${item.date.month}/${item.date.year}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade500,
@@ -650,7 +690,7 @@ class _ExpenseTrackSegmentState extends State<ExpenseTrackSegment> {
                         ),
                       ),
                       Text(
-                        '${item.isIncome ? '+' : '-'}\$${item.amount.toStringAsFixed(2)}',
+                        '${item.isIncome ? '+' : '-'}\৳${item.amount.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,

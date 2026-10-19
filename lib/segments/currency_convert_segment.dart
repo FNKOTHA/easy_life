@@ -10,8 +10,7 @@ class CurrencyConvertSegment extends StatefulWidget {
 }
 
 class _CurrencyConvertSegmentState extends State<CurrencyConvertSegment> {
-  final TextEditingController _amountController =
-      TextEditingController(text: '100');
+  final TextEditingController _amountController = TextEditingController();
 
   String _fromCurrency = 'USD';
   String _toCurrency = 'BDT';
@@ -43,12 +42,6 @@ class _CurrencyConvertSegmentState extends State<CurrencyConvertSegment> {
 
   Future<void> _fetchRateAndConvert() async {
     final input = double.tryParse(_amountController.text.trim()) ?? 0;
-    if (input <= 0) {
-      setState(() {
-        _result = 0;
-      });
-      return;
-    }
 
     setState(() {
       _isLoading = true;
@@ -69,7 +62,7 @@ class _CurrencyConvertSegmentState extends State<CurrencyConvertSegment> {
 
         setState(() {
           _rate = rateValue;
-          _result = input * _rate;
+          _result = input > 0 ? input * _rate : 0;
           _isLoading = false;
         });
       } else {
@@ -146,6 +139,9 @@ class _CurrencyConvertSegmentState extends State<CurrencyConvertSegment> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1E2238),
                   ),
+                  onChanged: (_) {
+                    setState(() {});
+                  },
                   decoration: InputDecoration(
                     prefixIcon: Container(
                       padding: const EdgeInsets.all(12),
